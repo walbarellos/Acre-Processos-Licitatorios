@@ -3,55 +3,83 @@ import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
 
-# URLs
+# -------------------------------
+# CONFIGURAÇÕES INICIAIS
+# -------------------------------
+
+# Endereços do sistema de licitações do Acre
 LOGIN_URL = 'https://licitacao.ac.gov.br/editais/check_login.php'
 LISTA_URL = 'https://licitacao.ac.gov.br/editais/index.php?task=lista_editais'
+
+# Pasta onde os arquivos PDF serão salvos
 DESTINO_PASTA = 'pdfs_editais'
 
-# Credenciais
+# Informe seu CPF ou CNPJ de login e a senha do sistema (geralmente 4 a 5 dígitos)
 USUARIO = 'CPF/CNPJ'
-SENHA = 'SENHA' # geralmente 4 ou 5 digitos
+SENHA = 'SENHA'  # ex: '1234'
 
-# Cria sessão persistente
+# -------------------------------
+# FAZENDO LOGIN NO SISTEMA
+# -------------------------------
+
+# Cria uma sessão para manter o login ativo durante as próximas requisições
 sessao = requests.Session()
 
-# Payload do formulário
+# Dados enviados no formulário de login
 payload = {
-    'cnpj': USUARIO,
-    'senha': SENHA,
-    'task': 'check_login',
+    'cnpj': USUARIO,              # Campo "cnpj" recebe CPF ou CNPJ
+    'senha': SENHA,               # Campo "senha" recebe a senha do sistema
+    'task': 'check_login',        # Campos ocultos que fazem parte da autenticação
     'option': 'com_licitacoes'
 }
 
-# 1. Login POST
+# Envia os dados para o sistema para fazer o login
 res_login = sessao.post(LOGIN_URL, data=payload)
 
-# 2. Verifica sucesso
+# Verifica se o login funcionou corretamente
 if "index.php?task=lista_editais" not in res_login.text and "sair" not in res_login.text.lower():
-    print("Conteúdo recebido (início):\n", res_login.text[:1000])
-    raise Exception("❌ Login falhou — verifique usuário/senha ou payload")
+    print("⚠️ Erro: conteúdo retornado pelo sistema (parcial):\n", res_login.text[:1000])
+    raise Exception("❌ Login falhou — verifique se o CPF/CNPJ e a senha estão corretos.")
 
-# 3. Vai para a página da lista de editais
+# -------------------------------
+# ACESSANDO A LISTA DE EDITAIS
+# -------------------------------
+
+# Após login, acessa a página onde estão os links dos editais
 res_lista = sessao.get(LISTA_URL)
+
+# Interpreta o conteúdo HTML da página usando BeautifulSoup
 soup = BeautifulSoup(res_lista.text, 'html.parser')
 
-# 4. Extrai os links dos PDFs
-pdf_links = [urljoin(LISTA_URL, a['href']) for a in soup.find_all('a', href=True) if a['href'].lower().endswith('.pdf')]
+# Procura por todos os links que terminam em ".pdf"
+pdf_links = [
+    urljoin(LISTA_URL, a['href'])  # Monta o link completo do PDF
+    for a in soup.find_all('a', href=True)
+    if a['href'].lower().endswith('.pdf')
+]
 
-print(f"🔎 {len(pdf_links)} PDF(s) encontrados.")
+print(f"🔎 Foram encontrados {len(pdf_links)} arquivos PDF de editais.")
 
-# 5. Baixa os PDFs
+# -------------------------------
+# FAZENDO O DOWNLOAD DOS EDITAIS
+# -------------------------------
+
+# Cria a pasta onde os PDFs serão salvos (se ainda não existir)
 os.makedirs(DESTINO_PASTA, exist_ok=True)
 
+# Baixa um por um os arquivos encontrados
 for link in pdf_links:
+    # Extrai o nome do arquivo a partir do link
     nome_arquivo = os.path.basename(link.split('/')[-1])
+
+    # Monta o caminho completo onde o arquivo será salvo localmente
     caminho = os.path.join(DESTINO_PASTA, nome_arquivo)
 
+    # Verifica se o arquivo já existe para evitar baixar novamente
     if not os.path.exists(caminho):
         print(f"⬇️  Baixando: {nome_arquivo}")
-        r = sessao.get(link)
+        r = sessao.get(link)  # Baixa o conteúdo do arquivo PDF
         with open(caminho, 'wb') as f:
-            f.write(r.content)
+            f.write(r.content)  # Salva o conteúdo do PDF no disco
     else:
         print(f"✅ Já existe: {nome_arquivo}")
-
