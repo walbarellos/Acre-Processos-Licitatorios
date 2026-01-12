@@ -2,6 +2,10 @@ import os
 import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
+from dotenv import load_dotenv
+
+# Carrega as variáveis de ambiente do arquivo .env
+load_dotenv()
 
 # -------------------------------
 # CONFIGURAÇÕES INICIAIS
@@ -15,8 +19,12 @@ LISTA_URL = 'https://licitacao.ac.gov.br/editais/index.php?task=lista_editais'
 DESTINO_PASTA = 'pdfs_editais'
 
 # Informe seu CPF ou CNPJ de login e a senha do sistema (geralmente 4 a 5 dígitos)
-USUARIO = 'CPF/CNPJ'
-SENHA = 'SENHA'  # ex: '1234'
+USUARIO = os.getenv('USUARIO')
+SENHA = os.getenv('SENHA')
+
+# Verifica se as credenciais foram definidas no .env
+if not USUARIO or not SENHA:
+    raise Exception("❌ As variáveis de ambiente USUARIO e SENHA não foram definidas. Crie um arquivo .env e adicione as credenciais.")
 
 # -------------------------------
 # FAZENDO LOGIN NO SISTEMA
